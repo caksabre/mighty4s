@@ -1,0 +1,14 @@
+# Local tool state (contains tokens and logs)
+.gstack/
+.claude/
+.vercel/
+
+# Build output: run npm run build
+dist/
+
+# Source material from the club book: copyrighted, and includes personal details
+reference/
+*.pdf
+
+node_modules/
+.DS_Store
