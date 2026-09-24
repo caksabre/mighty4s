@@ -21,7 +21,7 @@ Run `npm run build`, then upload `dist/index.html` as the site root. It is a sin
 
 ## Play the campaign
 
-A full-screen, Stick Cricket-style batting game. Chase each opponent's total off 6 overs with 10 wickets, then move on. The fixed route covers all 63 distinct opponents from the nine historical league tables. Targets rise a run a match, from 18 to 80. Later sides bowl quicker, move the ball more, set deeper fields and catch better. Progress, your XI and the sound setting save locally.
+A full-screen, Stick Cricket-style batting game. Chase each opponent's total off 6 overs with 10 wickets, then move on. The fixed route covers all 63 distinct opponents from the nine historical league tables. The first chase needs a run a ball (36 off 36); targets climb to 84 by the last match. Later sides bowl quicker, move the ball more, set deeper fields and catch better. Progress, your XI and the sound setting save locally.
 
 **Controls**
 

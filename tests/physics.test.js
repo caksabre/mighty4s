@@ -69,7 +69,7 @@ test('placement steers perfect ground shots away from fielders',()=>{
 test('a solid club batter can win the opening chase and the last one is a genuine challenge',()=>{
  const rng=seeded(21),g=()=>(rng()+rng()+rng()-1.5)/.75;
  const chase=(strength,target)=>{let runs=0,wk=0;for(let b=0;b<36&&wk<10&&runs<target;b++){const d=makeDelivery({strength,type:b%12<6?'pace':'spin',rng}),p=deliveryPath(d);const shot=p.atBat.x>.6?null:['leg','off','straight'].sort((x,y)=>shotFit(y,d,p.atBat)-shotFit(x,d,p.atBat))[0];const o=resolveBall({delivery:d,shot,loft:rng()<.3,errorMs:g()*45,fielders:makeField(strength,rng),rng}).outcome;runs+=o.runs;if(o.wide)b--;if(o.wicket)wk++}return runs>=target};
- let first=0,last=0;for(let i=0;i<60;i++){first+=chase(0,18);last+=chase(1,80)}
+ let first=0,last=0;for(let i=0;i<60;i++){first+=chase(0,36);last+=chase(1,84)}
  assert.ok(first>=54,`opening chase won ${first}/60`);assert.ok(last>=3&&last<=50,`final chase won ${last}/60`);
 });
 test('the sweet spot is where the ball visibly meets the bat: about 170ms before it reaches the crease',()=>{

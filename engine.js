@@ -56,8 +56,8 @@ export function finishRound(league,userResult,rng=Math.random){if(league.complet
 export function chaseFixtures(seasons){
  const names=[...new Set(seasons.flatMap(s=>[...s.teams].reverse()))];
  const last=Math.max(1,names.length-1);
- // Targets climb a run a match, from 18 to 80, off six overs; strength drives bowling pace, movement and fielding.
- return names.map((opponent,index)=>({opponent,index,target:18+index,limit:36,strength:index/last}));
+ // Targets climb from 36 (a run a ball) to 84 off six overs; strength drives bowling pace, movement and fielding.
+ return names.map((opponent,index)=>({opponent,index,target:Math.round(36+index*48/last),limit:36,strength:index/last}));
 }
 export function createChase(xi,fixture){
  const m=createMatch({xi,opponent:fixture.opponent,limit:fixture.limit,batFirst:false,strength:fixture.strength});

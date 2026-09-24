@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {PLAYERS,SEASONS} from '../data.js';
 import {chaseFixtures,createChase,isBatting,applyBall,battingResult} from '../engine.js';
 const fixtures=chaseFixtures(SEASONS),xi=PLAYERS.slice(0,11);
-test('fixed route includes every source opponent and increases target and strength every match',()=>{
+test('fixed route includes every source opponent; targets never drop and strength rises every match',()=>{
  assert.deepEqual(new Set(fixtures.map(f=>f.opponent)),new Set(SEASONS.flatMap(s=>s.teams)));
- for(const [i,f] of fixtures.entries()){assert.equal(f.limit,36);assert.ok(f.target<=f.limit*6);if(i){assert.ok(f.target>fixtures[i-1].target);assert.ok(f.strength>fixtures[i-1].strength)}}
+ for(const [i,f] of fixtures.entries()){assert.equal(f.limit,36);assert.ok(f.target<=f.limit*6);if(i){assert.ok(f.target>=fixtures[i-1].target);assert.ok(f.strength>fixtures[i-1].strength)}}
 });
 test('every campaign match begins batting against an existing score and terminates as a chase',()=>{
  for(const f of fixtures){const m=createChase(xi,f);assert.ok(isBatting(m));assert.equal(m.inning,1);assert.equal(m.innings[0].runs,f.target-1);while(m.stage==='ready')applyBall(m,{runs:6,wicket:false});assert.equal(m.winner,'fours');assert.equal(m.stage,'done')}
@@ -31,4 +31,4 @@ test('wides add a run to the team without using a ball, and can win a chase',()=
  assert.equal(m.innings[1].runs,1);assert.equal(m.innings[1].balls,0);assert.equal(m.innings[1].extras,1);assert.equal(m.innings[1].batting[0].runs,0);
  const n=createChase(xi,fixtures[0]);applyBall(n,{runs:fixtures[0].target-1,wicket:false});applyBall(n,{runs:1,wide:true,wicket:false});assert.equal(n.winner,'fours');assert.equal(n.stage,'done');
 });
-test('campaign runs from 18 to 80 off six overs',()=>{assert.equal(fixtures[0].target,18);assert.equal(fixtures.at(-1).target,80);assert.equal(fixtures[0].limit,36)});
+test('campaign runs from a run a ball (36) to 84 off six overs',()=>{assert.equal(fixtures[0].target,36);assert.equal(fixtures.at(-1).target,84);assert.ok(fixtures.every(f=>f.target>=f.limit));assert.equal(fixtures[0].limit,36)});
