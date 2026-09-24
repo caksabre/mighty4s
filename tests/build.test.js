@@ -10,4 +10,6 @@ test('standalone build retains valid JavaScript and embeds all runtime assets',(
  const checked=spawnSync(process.execPath,['--input-type=module','--check'],{input:code,encoding:'utf8'});
  assert.equal(checked.status,0,checked.stderr);
  assert.ok(!/^import /m.test(code));assert.ok(!/<script[^>]+src=/.test(html));assert.ok(!/<link[^>]+stylesheet/.test(html));assert.ok(html.includes('data:image/jpeg;base64,'));
+ for(const n of ['six','wicket','ooh','bed'])assert.ok(!html.includes(`assets/sfx/${n}.mp3`),`${n} clip not inlined`);
+ assert.equal((html.match(/data:audio\/mpeg;base64,/g)||[]).length,4);
 });

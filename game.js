@@ -11,20 +11,28 @@ const hueOf=name=>[...name].reduce((h,ch)=>(h*31+ch.charCodeAt(0))%360,7);
 // ---------- Sound: everything is synthesised, so the standalone file needs no audio assets.
 export const sfx=(()=>{
  let ctx=null,master=null,noiseBuf=null,murmur=null,on=true;
+ // Real crowd recordings (public domain / CC0, see assets/sfx/CREDITS.md). The build inlines them.
+ const CLIP_URLS={six:'assets/sfx/six.mp3',wicket:'assets/sfx/wicket.mp3',ooh:'assets/sfx/ooh.mp3',bed:'assets/sfx/bed.mp3'},clips={};
+ function loadClips(){for(const [k,u] of Object.entries(CLIP_URLS))fetch(u).then(r=>r.arrayBuffer()).then(b=>ctx&&ctx.decodeAudioData(b)).then(buf=>{if(!buf)return;clips[k]=buf;if(k==='bed')startBed()}).catch(()=>{})}
+ function startBed(){if(!ctx||!clips.bed)return;const s=ctx.createBufferSource();s.buffer=clips.bed;s.loop=true;const g=ctx.createGain();g.gain.value=.22;s.connect(g);g.connect(master);s.start();if(murmur)murmur.gain.value=0}
+ // Plays a clip; falls back to the synthesised version until clips have loaded.
+ function clip(name,{gain=1,cut=0,delay=0}={}){if(!ctx||!clips[name])return false;const t=ctx.currentTime+delay,s=ctx.createBufferSource(),g=ctx.createGain();s.buffer=clips[name];g.gain.setValueAtTime(gain,t);if(cut){g.gain.setValueAtTime(gain,t+cut*.6);g.gain.exponentialRampToValueAtTime(.0001,t+cut)}s.connect(g);g.connect(master);s.start(t);return true}
  function init(){if(ctx||!on)return;try{ctx=new (window.AudioContext||window.webkitAudioContext)();master=ctx.createGain();master.gain.value=.9;master.connect(ctx.destination);
   noiseBuf=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate);const d=noiseBuf.getChannelData(0);let b=0;for(let i=0;i<d.length;i++){const w=Math.random()*2-1;b=(b+.02*w)/1.02;d[i]=w*.6+b*3}
-  const src=ctx.createBufferSource();src.buffer=noiseBuf;src.loop=true;const f=ctx.createBiquadFilter();f.type='bandpass';f.frequency.value=520;f.Q.value=.6;murmur=ctx.createGain();murmur.gain.value=.018;src.connect(f);f.connect(murmur);murmur.connect(master);src.start()}catch{ctx=null}}
+  const src=ctx.createBufferSource();src.buffer=noiseBuf;src.loop=true;const f=ctx.createBiquadFilter();f.type='bandpass';f.frequency.value=520;f.Q.value=.6;murmur=ctx.createGain();murmur.gain.value=.018;src.connect(f);f.connect(murmur);murmur.connect(master);src.start();loadClips()}catch{ctx=null}}
  function burst(dur,{type='bandpass',freq=1000,q=1,gain=.3,attack=.004,sweep=0,delay=0}={}){if(!ctx)return;const t=ctx.currentTime+delay,s=ctx.createBufferSource();s.buffer=noiseBuf;const f=ctx.createBiquadFilter();f.type=type;f.frequency.setValueAtTime(freq,t);if(sweep)f.frequency.exponentialRampToValueAtTime(freq*sweep,t+dur);f.Q.value=q;const g=ctx.createGain();g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(gain,t+attack);g.gain.exponentialRampToValueAtTime(.0001,t+dur);s.connect(f);f.connect(g);g.connect(master);s.start(t,Math.random()*1.5);s.stop(t+dur+.05)}
  function tone(freq,dur,{gain=.2,type='sine',slide=1,delay=0}={}){if(!ctx)return;const t=ctx.currentTime+delay,o=ctx.createOscillator(),g=ctx.createGain();o.type=type;o.frequency.setValueAtTime(freq,t);if(slide!==1)o.frequency.exponentialRampToValueAtTime(freq*slide,t+dur);g.gain.setValueAtTime(gain,t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g);g.connect(master);o.start(t);o.stop(t+dur+.02)}
  return {
-  init,get on(){return on},set(v){on=v;if(!v&&ctx){ctx.close();ctx=null}else init()},
+  init,get on(){return on},get loaded(){return Object.keys(clips)},set(v){on=v;if(!v&&ctx){ctx.close();ctx=null}else init()},
   bat(q=1){burst(.05,{type:'highpass',freq:1800,gain:.5*q+.15});tone(1250,.09,{gain:.25*q+.08,type:'triangle',slide:.6});tone(420,.07,{gain:.12,slide:.5})},
   edge(){tone(1900,.05,{gain:.12,type:'square',slide:.7});burst(.03,{freq:3000,gain:.12})},
   bounce(){burst(.05,{type:'lowpass',freq:420,gain:.22})},
   step(){burst(.04,{type:'lowpass',freq:260,gain:.08})},
   stumps(){for(let i=0;i<4;i++){burst(.06,{freq:2200-i*300,q:3,gain:.35,delay:i*.035});tone(700-i*90,.12,{gain:.1,type:'square',delay:i*.035,slide:.6})}},
-  cheer(level=1){burst(1.2+level,{freq:900,q:.5,gain:.2*level,attack:.18,sweep:1.3});burst(1+level*.8,{freq:2100,q:.8,gain:.08*level,attack:.25});if(level>1.2)for(let i=0;i<6;i++)burst(.05,{type:'highpass',freq:3000,gain:.06,delay:.2+i*.09+Math.random()*.05})},
-  ooh(){burst(.9,{freq:380,q:1.8,gain:.16,attack:.12,sweep:1.8})},
+  // Six: the full cheer. Four: a shorter, quieter one. Singles: a ripple of applause.
+  cheer(level=1){if(clip('six',{gain:level>=2?1:level>=1?.55:.22,cut:level>=2?0:level>=1?1.9:1.1}))return;burst(1.2+level,{freq:900,q:.5,gain:.2*level,attack:.18,sweep:1.3});burst(1+level*.8,{freq:2100,q:.8,gain:.08*level,attack:.25});if(level>1.2)for(let i=0;i<6;i++)burst(.05,{type:'highpass',freq:3000,gain:.06,delay:.2+i*.09+Math.random()*.05})},
+  wicket(delay=0){if(clip('wicket',{delay}))return;this.cheer(1.6)},
+  ooh(){if(clip('ooh',{gain:.9}))return;burst(.9,{freq:380,q:1.8,gain:.16,attack:.12,sweep:1.8})},
   groan(){burst(1,{freq:600,q:1.4,gain:.12,attack:.1,sweep:.55})},
   click(){tone(880,.05,{gain:.07,type:'triangle'})},
   win(){[523,659,784,1047].forEach((f,i)=>tone(f,.35,{gain:.12,type:'triangle',delay:i*.12}));this.cheer(2)},
@@ -217,7 +225,7 @@ function drawBatScene(P,W,H,s){
  if(s.bounceMark){const [bx,by,bs]=pr(s.bounceMark.x,s.bounceMark.y),age=t-s.bounceMark.t;P.oval(bx,by,bs*.14,bs*.05,'#8b6b3a66');if(age<.5)c.strokeStyle=`rgba(255,255,255,${.6*(1-age/.5)})`,c.lineWidth=2,c.beginPath(),c.ellipse(bx,by,bs*(.1+age*.5),bs*(.03+age*.15),0,0,Math.PI*2),c.stroke()}
  // Depth-sorted actors, far to near.
  const actors=[];
- for(const f of s.fielders||[]){if(f.y<3||f.name==='Bowler')continue;actors.push({y:f.y,draw(){const [x,y,k]=pr(f.x,f.y);drawFigure(P,x,y,k,{pose:s.phase==='live'?'ready':'ready',t:t+f.x,cap:s.oppCap})}})}
+ for(const f of s.fielders||[]){if(f.y<3||f.name==='Bowler')continue;actors.push({y:f.y,draw(){const [x,y,k]=pr(f.x,f.y);drawFigure(P,x,y,k,{pose:s.celebrate?'arms-up':'ready',t:t+f.x,cap:s.oppCap})}})}
  actors.push({y:PITCH+2,draw(){const [x,y,k]=pr(-1.2,PITCH+1.8);drawFigure(P,x,y,k,{pose:'ready',t,kit:'#f2efe4',cap:'#fbfbf5'})}});
  actors.push({y:PITCH+.8,draw(){const [x,y,k]=pr(1.25,PITCH+.8);drawFigure(P,x,y,k,{pose:'ready',t:t*.6,cap:'#12483a'})}});
  actors.push({y:PITCH,draw(){drawStumpsP(P,pr,PITCH,null)}});
@@ -271,7 +279,7 @@ function drawFieldScene(P,W,H,s){
   const r=Math.max(3.5,kk*.42+b.h*.1);P.dot(bx,by,r+1.2,'#3a0a14');P.dot(bx,by,r,'#e0364c');P.dot(bx-r*.3,by-r*.3,r*.35,'#ffc9bf')}})}
  actors.sort((a,b)=>b.y-a.y).forEach(a=>a.draw());
  if(s.ropeFlash){const [x,y]=pr(s.ropeFlash.x,s.ropeFlash.y),age=s.time-s.ropeFlash.t;if(age<1.2){c.globalAlpha=1-age/1.2;P.text(s.ropeFlash.text,x,y-20-age*30,34,s.ropeFlash.text==='6'?'#ffe066':'#ffffff');c.globalAlpha=1}}
- P.text('FIELD CAM',18,H-18,11,'#e9f6ec','left');
+ if(W>600)P.text('FIELD CAM',18,H-18,11,'#e9f6ec','left');
 }
 
 // ---------- The game.
@@ -337,7 +345,8 @@ export function createGame(root,opts){
   hud();
  }
  function nextBall(){
-  clearCallout();G.phase='runup';G.stumps=null;G.bounceMark=null;G.trail=[];G.field=null;G.overJustEnded=false;
+  el('g-comm').classList.remove('show'); // never leave last ball's words over the bowler's run-up
+  clearCallout();G.cheered=false;G.phase='runup';G.stumps=null;G.bounceMark=null;G.trail=[];G.field=null;G.overJustEnded=false;
   const type=overType();G.ball={d:makeDelivery({strength,type}),shot:null,swing:null,result:null};G.ball.path=deliveryPath(G.ball.d);
   G.runDur=type==='spin'?1.0:1.55-strength*.2;G.timer=0;G.swing={phase:'stance'};
   G.bowler={x:-.6,y:type==='spin'?27:36,pose:'run',anim:0};hud();
@@ -384,9 +393,10 @@ export function createGame(root,opts){
   G.outIndex=o.wicket?inn().striker:null;
   applyBall(match,{runs:o.runs,wicket:!!o.wicket,wide:!!o.wide,dismissal:o.dismissal,label});
   callout(big,sub,cls);comm(say);
-  if(o.wicket){sfx.groan();G.shake=.25}
-  else if(o.runs===6){sfx.cheer(2.2);G.shake=.5;burstConfetti(80)}
-  else if(o.runs===4){sfx.cheer(1.4);G.shake=.2;burstConfetti(25)}
+  // The fielding side and the crowd erupt for a wicket; boundaries cheer once (the field cam may already have).
+  if(o.wicket){if(!G.cheered)sfx.wicket(o.dismissal==='caught'?0:.12);G.shake=.25;G.celebrate=G.time+2.2}
+  else if(o.runs===6){if(!G.cheered)sfx.cheer(2.2);G.shake=.5;burstConfetti(80)}
+  else if(o.runs===4){if(!G.cheered)sfx.cheer(1.4);G.shake=.2;burstConfetti(25)}
   else if(o.beaten)sfx.ooh();
   else if(o.runs>0)sfx.cheer(.5);
   G.phase='result';G.timer=o.runs>=6?2.4:o.wicket?2.2:o.runs>=4?2:1.4;G.lastWicket=!!o.wicket;
@@ -537,8 +547,8 @@ export function createGame(root,opts){
    if(k===0&&leg>(F.shownRuns||0)&&leg<=legs&&!o.wicket){F.shownRuns=leg;callout(String(leg),leg===1?'RUN':'RUNS','runs');sfx.click()}
   }
   // Boundary flash when the rope is crossed.
-  if(o.boundary&&!F.flashed&&t>=F.ballEnd){F.flashed=true;const last=sim.samples.at(-1);F.ropeFlash={x:last.x,y:last.y,text:String(o.boundary),t:G.time};if(o.boundary===6){G.shake=.4;sfx.cheer(1.5)}else sfx.cheer(1)}
-  if(sim.catchAt&&!F.caughtCue&&t>=sim.catchAt.t){F.caughtCue=true;sfx.groan()}
+  if(o.boundary&&!F.flashed&&t>=F.ballEnd){F.flashed=true;const last=sim.samples.at(-1);F.ropeFlash={x:last.x,y:last.y,text:String(o.boundary),t:G.time};G.cheered=true;if(o.boundary===6){G.shake=.4;sfx.cheer(2.2)}else sfx.cheer(1.4)}
+  if(sim.catchAt&&!F.caughtCue&&t>=sim.catchAt.t){F.caughtCue=true;G.cheered=true;sfx.wicket()}
   if(sim.dropAt&&!F.dropCue&&t>=sim.dropAt.t){F.dropCue=true;sfx.ooh()}
   // Camera follows the ball, framed with the pitch.
   const cam=F.cam,wantX=bp.x*.55,wantY=10+(bp.y-10)*.55,wantZ=1.25+Math.min(.35,Math.hypot(bp.x,bp.y-10)/200);
@@ -556,11 +566,11 @@ export function createGame(root,opts){
   if(G.phase==='field'&&G.field){const F=G.field;drawFieldScene(P,W,H,{cam:F.cam,time:G.time,fieldMen:F.men.map(m=>({...m})),runners:F.runners,fball:G.fball,ftrail:F.trail,landing:F.landing,ropeFlash:F.ropeFlash,oppCap})}
   else{
    const swingPose=batterPose(G.swing,G.time);
-   drawBatScene(P,W,H,{time:G.time,phase:G.phase,fielders:G.fielders,bowler:G.phase==='intro'?{x:-.6,y:30,pose:'ready',anim:0}:G.bowler||{x:-.6,y:30,pose:'ready',anim:G.time},ballPos:(G.phase==='live'||G.phase==='post'||G.phase==='hit')?G.ballPos:null,trail:G.trail,batPose:swingPose,shirtName:shirtName(),shirtNumber:(G.outIndex??inn().striker)+1,stumps:G.stumps,bounceMark:G.bounceMark,oppCap});
+   drawBatScene(P,W,H,{time:G.time,phase:G.phase,fielders:G.fielders,bowler:G.phase==='intro'?{x:-.6,y:30,pose:'ready',anim:0}:G.bowler||{x:-.6,y:30,pose:'ready',anim:G.time},ballPos:(G.phase==='live'||G.phase==='post'||G.phase==='hit')?G.ballPos:null,trail:G.trail,batPose:swingPose,celebrate:G.celebrate>G.time,shirtName:shirtName(),shirtNumber:(G.outIndex??inn().striker)+1,stumps:G.stumps,bounceMark:G.bounceMark,oppCap});
    // Timing guide: the contact zone lights as the ball arrives.
    // It closes onto the contact point as the ball arrives, and fades out as the campaign gets harder.
    if(G.phase==='live'&&G.ball&&!G.ball.shot){const t=G.time-G.ball.t0,ideal=G.ball.path.ideal+timingOffset/1000,dd=ideal-t,help=1-strength*.75;if(dd<.5&&dd>-.08){const at=G.ball.path.at(ideal),[x,y,k]=batProj(W,at.x,at.y,at.h),q=Math.max(0,dd)/.5,r=k*(.1+q*.55),a=help*(dd<0?Math.max(0,1+dd/.08):.35+.65*(1-q)),hot=Math.abs(dd)<WINDOW.perfect/1000;ctx.strokeStyle=hot?`rgba(255,226,90,${a})`:`rgba(255,255,255,${a})`;ctx.lineWidth=hot?4:2.5;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.stroke()}}
-   if(G.phase!=='intro')P.text('BATTER CAM',18,H-18,11,'#e9f6ec','left');
+   if(G.phase!=='intro'&&W>600)P.text('BATTER CAM',18,H-18,11,'#e9f6ec','left');
   }
   ctx.setTransform(dpr*S,0,0,dpr*S,0,0);
   for(const p of G.confetti){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.r);ctx.fillStyle=p.col;ctx.globalAlpha=Math.min(1,p.life);ctx.fillRect(-4,-2,8,4);ctx.restore()}
